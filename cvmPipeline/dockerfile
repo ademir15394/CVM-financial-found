@@ -1,0 +1,14 @@
+# Imagem base oficial do AWS Lambda para Python 3.11
+FROM public.ecr.aws/lambda/python:3.11
+
+# Copia o arquivo de dependências
+COPY requirements.txt ${LAMBDA_TASK_ROOT}
+
+# Instala as dependências Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia todo o código do scraper para o diretório de execução da Lambda
+COPY scraper/ ${LAMBDA_TASK_ROOT}/scraper/
+
+# Handler padrão (pode ser sobrescrito nas configurações de cada Lambda na AWS)
+CMD [ "scraper/inf_daily/inf_daily.lambda_handler" ]
