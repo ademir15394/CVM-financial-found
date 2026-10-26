@@ -46,6 +46,7 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --provenance=false \
+            -f cvmPipeline/dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             --push .

@@ -113,12 +113,13 @@ data "aws_iam_policy_document" "github_actions_assume_role_policy" {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values   = [
-        "repo:ademir15394/CVM-financial-found:*"
+        # Curinga inteligente que cobre tanto o formato tradicional quanto o novo formato 
+        # com IDs imutáveis do GitHub para o seu repositório específico
+        "repo:ademir15394*/*CVM-financial-found*:*"
       ]
     }
   }
 }
-
 resource "aws_iam_role" "github_actions_role" {
   name               = "cvm_github_actions_role_dev"
   assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role_policy.json
