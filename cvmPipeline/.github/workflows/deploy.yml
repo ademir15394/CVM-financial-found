@@ -5,7 +5,6 @@ on:
     branches:
       - main
 
-# Permissões estritamente necessárias para o OIDC do GitHub Actions autenticar na AWS
 permissions:
   id-token: write
   contents: read
@@ -13,8 +12,7 @@ permissions:
 env:
   AWS_REGION: "us-east-1"
   ECR_REPOSITORY: "cvm-scrapers"
-  # Substitua abaixo pelo ARN exato da Role gerada pelo Terraform (output github_actions_role_arn)
-  ROLE_TO_ASSUME: "arn:aws:iam::SUA_CONTA_AWS_ID:role/cvm_github_actions_role_dev"
+  ROLE_TO_ASSUME: "arn:aws:iam::404438143202:role/cvm_github_actions_role_dev"
 
 jobs:
   build-and-deploy:
@@ -44,9 +42,10 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Compila a imagem para arquitetura x86_64 (padrão do Lambda) e envia ao ECR com a tag do commit e 'latest'
+          # Adicionado --provenance=false para garantir compatibilidade com o AWS Lambda
           docker buildx build \
             --platform linux/amd64 \
+            --provenance=false \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             --push .
@@ -72,4 +71,4 @@ jobs:
             --function-name cvm-scraper-inf-daily \
             --image-uri $IMAGE_URI
             
-      echo "Deploy concluído com sucesso em todas as funções Lambda!"
+          echo "Deploy concluído com sucesso em todas as funções Lambda!"
