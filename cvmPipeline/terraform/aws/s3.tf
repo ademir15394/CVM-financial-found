@@ -1,21 +1,24 @@
-resource "aws_s3_bucket" "cvm-data" {
-
-    bucket = "cvm-data-${var.environment}-${data.aws_caller_identity.current.account_id}"
-  
+resource "aws_s3_bucket" "landing_zone" {
+  bucket        = "cvm-landing-zone-${var.environment}-${data.aws_caller_identity.current.account_id}"
+  force_destroy = false
 }
 
-resource "aws_s3_account_public_access_block" "cvm-access" {
+resource "aws_s3_bucket_public_access_block" "landing_zone_block" {
+  bucket = aws_s3_bucket.landing_zone.id
 
-    block_public_acls       = false
-    block_public_policy     = false
-    ignore_public_acls      = false
-    restrict_public_buckets = false
-
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 resource "aws_s3_bucket_versioning" "versioning_example" {
-  bucket = aws_s3_bucket.cvm-data.id
+  bucket = aws_s3_bucket.landing_zone.id
   versioning_configuration {
     status = "Enabled"
   }
 }
+
+data "aws_caller_identity" "current" {}
+
+
