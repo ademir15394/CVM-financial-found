@@ -93,9 +93,35 @@ data "aws_iam_policy_document" "github_assume_role" {
   }
 }
 
+data "aws_iam_policy_document" "github_actions_assume_role_policy" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = [
+        "repo:ademir15394/CVM-financial-found:*"
+      ]
+    }
+  }
+}
+
 resource "aws_iam_role" "github_actions_role" {
-  name               = "cvm_github_actions_role_${var.environment}"
-  assume_role_policy = data.aws_iam_policy_document.github_assume_role.json
+  name               = "cvm_github_actions_role_dev"
+  assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role_policy.json
 }
 
 # Anexo da política padrão do ECR para o pipeline do GitHub Actions fazer push das imagens
