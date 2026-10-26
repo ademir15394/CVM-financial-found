@@ -38,6 +38,7 @@ jobs:
 
       - name: Build, Tag and Push Image to Amazon ECR
         id: build-image
+        working-directory: cvmPipeline
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
@@ -46,7 +47,6 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --provenance=false \
-            -f cvmPipeline/dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             --push .
