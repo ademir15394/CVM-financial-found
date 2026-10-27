@@ -17,7 +17,7 @@ table = dynamodb.Table(TABLE_NAME)
 DATASETS_CONFIG = {
     'INFORME_DIARIO': {
         'url_pattern': 'https://dados.cvm.gov.br/dados/FII/DOC/INF_MENSAL/DADOS/inf_mensal_fii_{ano_mes_str}.zip',
-        's3_prefix': 'raw/cvm/informe_diario/'
+        's3_prefix': 'cvm_data/inf-cad/'
     }
 }
 
@@ -117,7 +117,7 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
         is_representation = False
 
     # 3. Baixar arquivo atualizado/novo e salvar no S3 organizando por competência
-    s3_key = f"{config['s3_prefix']}ano={ref_date.year}/mes={ref_date.strftime('%m')}/{file_name}"
+    s3_key = f"{ ['s3_prefix']}ano={ref_date.year}/mes={ref_date.strftime('%m')}/{file_name}"
     
     get_req = urllib.request.Request(url, method='GET')
     get_req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')

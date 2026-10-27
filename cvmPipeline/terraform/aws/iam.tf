@@ -13,6 +13,29 @@ data "aws_iam_policy_document" "lambda_assume_role" {
   }
 }
 
+resource "aws_iam_role_policy" "github_actions_lambda_update_policy" {
+  name = "github_actions_lambda_update_policy"
+  role = aws_iam_role.github_actions_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:UpdateFunctionCode",
+          "lambda:GetFunction"
+        ]
+        Resource = [
+          "arn:aws:lambda:us-east-1:404438143202:function:cvm-scraper-inf-cad",
+          "arn:aws:lambda:us-east-1:404438143202:function:cvm-scraper-inf-cda",
+          "arn:aws:lambda:us-east-1:404438143202:function:cvm-scraper-inf-daily"
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role" "lambda_exec_role" {
   name               = "cvm_lambda_execution_role_${var.environment}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json

@@ -17,7 +17,7 @@ table = dynamodb.Table(TABLE_NAME)
 DATASETS_CONFIG = {
     'INFORME_DIARIO': {
         'url_pattern': 'https://dados.cvm.gov.br/dados/FI/DOC/INF_DIARIO/DADOS/inf_diario_fi_{ano_mes_str}.zip',
-        's3_prefix': 'raw/cvm/informe_diario/'
+        's3_prefix': 'cvm_data/inf-daily/'
     }
 }
 
