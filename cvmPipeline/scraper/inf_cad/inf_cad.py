@@ -15,7 +15,7 @@ table = dynamodb.Table(TABLE_NAME)
 
 # Mapeamento dos datasets e padrões de URL da CVM
 DATASETS_CONFIG = {
-    'INFORME_DIARIO': {
+    'INFORME_MENSAL_CADASTRAL': {
         'url_pattern': 'https://dados.cvm.gov.br/dados/FII/DOC/INF_MENSAL/DADOS/inf_mensal_fii_{ano_mes_str}.zip',
         's3_prefix': 'cvm_data/inf-cad/'
     }

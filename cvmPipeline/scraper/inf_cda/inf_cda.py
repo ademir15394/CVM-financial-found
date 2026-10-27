@@ -15,7 +15,7 @@ table = dynamodb.Table(TABLE_NAME)
 
 # Mapeamento dos datasets e padrões de URL da CVM
 DATASETS_CONFIG = {
-    'INFORME_DIARIO': {
+    'INFORME_DIARIO_CDA': {
         'url_pattern': 'https://dados.cvm.gov.br/dados/FI/DOC/CDA/DADOS/cda_fi_{ano_mes_str}.zip',
         's3_prefix': 'cvm_data/cda/'
     }
