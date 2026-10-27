@@ -9,15 +9,14 @@ s3_client = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 
 TABLE_NAME = os.environ.get('DYNAMODB_TABLE', 'cvm_ingestion_control')
-# ATENÇÃO: O bucket S3 deve ser apenas o nome do bucket, sem o prefixo 's3://'
+# O bucket S3 deve conter apenas o nome limpo, sem o protocolo 's3://'
 S3_BUCKET = os.environ.get('S3_BUCKET_NAME', 'cvm-landing-zone-dev-404438143202')
 
 table = dynamodb.Table(TABLE_NAME)
 
-# Mapeamento dos datasets e padrões de URL da CVM (Corrigido para formato anual)
+# Mapeamento dos datasets e padrões de URL da CVM (formato anual consolidado)
 DATASETS_CONFIG = {
     'INFORME_MENSAL_CADASTRAL': {
-        # A CVM publica o informe mensal de FIIs consolidado por ANO (ex: inf_mensal_fii_2026.zip)
         'url_pattern': 'https://dados.cvm.gov.br/dados/FII/DOC/INF_MENSAL/DADOS/inf_mensal_fii_{ano}.zip',
         's3_prefix': 'cvm_data/inf-cad/'
     }
@@ -71,7 +70,7 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
     ano_str = ref_date.strftime("%Y")           # Ex: 2026 (para o arquivo anual da CVM)
     ano_mes_key = ref_date.strftime("%Y-%m")    # Ex: 2026-10 (para controle no DynamoDB e pastas)
     
-    # Gera o URL apontando para o arquivo do ano correspondente
+    # CORREÇÃO AQUI: Passamos 'ano=ano_str' para coincidir exatamente com o placeholder '{ano}' do url_pattern
     url = config['url_pattern'].format(ano=ano_str)
     file_name = url.split("/")[-1]
 
