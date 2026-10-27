@@ -9,13 +9,15 @@ s3_client = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 
 TABLE_NAME = os.environ.get('DYNAMODB_TABLE', 'cvm_ingestion_control')
-S3_BUCKET = os.environ.get('S3_BUCKET_NAME', 's3://databricks-data-file-404438143202-us-east-1-an/')
+# ATENÇÃO: O bucket S3 deve ser apenas o nome do bucket, sem o prefixo 's3://'
+S3_BUCKET = os.environ.get('S3_BUCKET_NAME', 'cvm-landing-zone-dev-404438143202')
 
 table = dynamodb.Table(TABLE_NAME)
 
-# Mapeamento dos datasets e padrões de URL da CVM
+# Mapeamento dos datasets e padrões de URL da CVM (Corrigido para formato anual)
 DATASETS_CONFIG = {
     'INFORME_MENSAL_CADASTRAL': {
+        # A CVM publica o informe mensal de FIIs consolidado por ANO (ex: inf_mensal_fii_2026.zip)
         'url_pattern': 'https://dados.cvm.gov.br/dados/FII/DOC/INF_MENSAL/DADOS/inf_mensal_fii_{ano}.zip',
         's3_prefix': 'cvm_data/inf-cad/'
     }
@@ -30,7 +32,7 @@ def get_competence_record(dataset_type: str, ano_mes: str) -> dict:
         })
         return response.get('Item')
     except Exception as e:
-        print(f"Erro ao buscar no DynamoDB ({dataset_type} - {ano_mes}): {str(e)}")
+        print(f"Erro ao buscar no DynamoDB ({dataset_type} {ano_mes}): {str(e)}")
         return None
 
 def save_competence_record(dataset_type: str, ano_mes: str, url: str, etag: str, last_modified: str, status: str, s3_location: str = None, is_representation: bool = False):
@@ -66,10 +68,11 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
     Processa um mês de competência específico para um determinado dataset.
     """
     config = DATASETS_CONFIG[dataset_type]
-    ano_mes_str = ref_date.strftime("%Y%m")     # Ex: 202604
-    ano_mes_key = ref_date.strftime("%Y-%m")    # Ex: 2026-04
+    ano_str = ref_date.strftime("%Y")           # Ex: 2026 (para o arquivo anual da CVM)
+    ano_mes_key = ref_date.strftime("%Y-%m")    # Ex: 2026-10 (para controle no DynamoDB e pastas)
     
-    url = config['url_pattern'].format(ano_mes_str=ano_mes_str)
+    # Gera o URL apontando para o arquivo do ano correspondente
+    url = config['url_pattern'].format(ano=ano_str)
     file_name = url.split("/")[-1]
 
     # 1. Obter metadados HTTP do arquivo na CVM via HEAD request
@@ -83,7 +86,7 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
             remote_last_modified = headers.get('Last-Modified', '')
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            print(f"[{dataset_type}] Arquivo para o mês {ano_mes_key} ainda não disponibilizado pela CVM (404).")
+            print(f"[{dataset_type}] Arquivo anual para o ano {ano_str} ainda não disponibilizado pela CVM (404).")
         else:
             print(f"Erro HTTP {e.code} ao acessar {url}")
         return
@@ -97,7 +100,7 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
     if existing_record:
         local_etag = existing_record.get('etag')
         
-        # Se o ETag for igual ao que já gravamos, o arquivo não sofreu reapresentação
+        # Se o ETag for igual ao que já gravamos, o arquivo não sofreu alterações
         if remote_etag and local_etag == remote_etag:
             print(f"[{dataset_type}] Mês {ano_mes_key} sem alterações (ETag idêntico). Ignorando download.")
             save_competence_record(
@@ -117,7 +120,8 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
         is_representation = False
 
     # 3. Baixar arquivo atualizado/novo e salvar no S3 organizando por competência
-    s3_key = f"{ ['s3_prefix']}ano={ref_date.year}/mes={ref_date.strftime('%m')}/{file_name}"
+    s3_prefix = config['s3_prefix']
+    s3_key = f"{s3_prefix}ano={ref_date.year}/mes={ref_date.strftime('%m')}/{file_name}"
     
     get_req = urllib.request.Request(url, method='GET')
     get_req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
@@ -152,9 +156,7 @@ def lambda_handler(event, context):
     Executa a raspagem para a janela de meses desejada.
     Exemplo: Mês atual + últimos 3 meses (para pegar reapresentações retroativas).
     """
-    # Quantidade de meses retroativos a verificar por reapresentações
     months_window = event.get('months_window', 3)
-    
     current_date = datetime.now()
     
     # Gera a lista das últimas N competências (mês/ano)
