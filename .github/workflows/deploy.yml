@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
 
 permissions:
   id-token: write
@@ -16,7 +17,7 @@ env:
 
 jobs:
   build-and-deploy:
-    name: Build Docker Image & Deploy to AWS
+    name: Build Docker Image & Push/Deploy
     runs-on: ubuntu-latest
 
     steps:
@@ -43,17 +44,24 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          # Define as tags dependendo da branch de origem
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            TAGS="-t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          else
+            TAGS="-t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:dev"
+          fi
+
           # Adicionado --provenance=false para garantir compatibilidade com o AWS Lambda
           docker buildx build \
             --platform linux/amd64 \
             --provenance=false \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            $TAGS \
             --push .
           
           echo "image_uri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Update AWS Lambda Functions Code
+      - name: Update AWS Lambda Functions Code (Apenas na Main)
+        if: github.ref == 'refs/heads/main'
         env:
           IMAGE_URI: ${{ steps.build-image.outputs.image_uri }}
         run: |
