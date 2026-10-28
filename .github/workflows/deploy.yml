@@ -25,12 +25,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials OIDC
+        if: github.ref == 'refs/heads/main'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to Amazon ECR
+        if: github.ref == 'refs/heads/main'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -38,6 +40,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build, Tag and Push Image to Amazon ECR
+        if: github.ref == 'refs/heads/main'
         id: build-image
         working-directory: cvmPipeline
         env:
