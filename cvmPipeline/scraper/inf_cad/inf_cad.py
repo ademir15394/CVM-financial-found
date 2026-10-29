@@ -3,6 +3,8 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
+import zipfile
+import tempfile
 import boto3
 
 s3_client = boto3.client('s3')
@@ -70,7 +72,6 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
     ano_str = ref_date.strftime("%Y")           # Ex: 2026 (para o arquivo anual da CVM)
     ano_mes_key = ref_date.strftime("%Y-%m")    # Ex: 2026-10 (para controle no DynamoDB e pastas)
     
-    # CORREÇÃO AQUI: Passamos 'ano=ano_str' para coincidir exatamente com o placeholder '{ano}' do url_pattern
     url = config['url_pattern'].format(ano=ano_str)
     file_name = url.split("/")[-1]
 
@@ -113,27 +114,47 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
             )
             return
         else:
-            print(f"[{dataset_type}] ATENÇÃO: Detectada REAPRESENTAÇÃO de dados no mês {ano_mes_key}! Baixando nova versão...")
+            print(f"[{dataset_type}] ATENÇÃO: Detectada REAPRESENTAÇÃO de dados no mês {ano_mes_key}! Baixando e descompactando nova versão...")
             is_representation = True
     else:
         is_representation = False
 
-    # 3. Baixar arquivo atualizado/novo e salvar no S3 organizando por competência
+    # 3. Utilizar diretório temporário isolado para download e descompactação
     s3_prefix = config['s3_prefix']
-    s3_key = f"{s3_prefix}ano={ref_date.year}/mes={ref_date.strftime('%m')}/{file_name}"
     
     get_req = urllib.request.Request(url, method='GET')
     get_req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
     
     try:
-        with urllib.request.urlopen(get_req) as response:
-            s3_client.upload_fileobj(
-                Fileobj=response,
-                Bucket=s3_bucket,
-                Key=s3_key
-            )
+        # O bloco TemporaryDirectory garante a limpeza automática ao sair do 'with'
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_zip_path = os.path.join(temp_dir, file_name)
             
-        s3_location = f"s3://{s3_bucket}/{s3_key}"
+            # Baixar o ZIP diretamente para o diretório temporário
+            print(f"[{dataset_type}] Baixando {file_name} para o diretório temporário...")
+            with urllib.request.urlopen(get_req) as response, open(temp_zip_path, 'wb') as out_file:
+                out_file.write(response.read())
+                
+            # Descompactar o ficheiro ZIP dentro do mesmo diretório temporário
+            extracted_dir = os.path.join(temp_dir, "extracted")
+            os.makedirs(extracted_dir, exist_ok=True)
+            
+            with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extracted_dir)
+                print(f"[{dataset_type}] Ficheiro descompactado com sucesso na pasta temporária.")
+
+            # Percorrer e enviar cada ficheiro extraído (ex: CSVs) para o S3
+            last_s3_location = None
+            for root, dirs, files in os.walk(extracted_dir):
+                for file in files:
+                    local_file_path = os.path.join(root, file)
+                    # Mantém a estrutura de pastas organizada por ano e mês na Landing Zone
+                    s3_key = f"{s3_prefix}ano={ref_date.year}/mes={ref_date.strftime('%m')}/{file}"
+                    
+                    print(f"[{dataset_type}] Enviando {file} para s3://{s3_bucket}/{s3_key}")
+                    s3_client.upload_file(local_file_path, s3_bucket, s3_key)
+                    last_s3_location = f"s3://{s3_bucket}/{s3_key}"
+            
         status_final = 'REPRESENTED_DOWNLOADED' if is_representation else 'DOWNLOADED'
         
         save_competence_record(
@@ -143,12 +164,13 @@ def process_month_competence(dataset_type: str, ref_date: datetime, s3_bucket: s
             etag=remote_etag,
             last_modified=remote_last_modified,
             status=status_final,
-            s3_location=s3_location,
+            s3_location=last_s3_location,
             is_representation=is_representation
         )
+        print(f"[{dataset_type}] Processo concluído para o mês {ano_mes_key}.")
 
     except Exception as e:
-        print(f"Falha no download/upload do mês {ano_mes_key}: {str(e)}")
+        print(f"Falha no processamento do mês {ano_mes_key}: {str(e)}")
 
 def lambda_handler(event, context):
     """
